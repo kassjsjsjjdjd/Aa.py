@@ -1,0 +1,34 @@
+name: Cloudflare-RDP
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Preparing RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+          net user runneradmin Password123! /add
+          net localgroup administrators runneradmin /add
+
+      - name: Install Cloudflared
+        run: |
+          curl -L --output cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
+
+      - name: Start Cloudflare Tunnel
+        run: |
+          Start-Process ./cloudflared.exe -ArgumentList "access tcp --hostname localhost --url rdp://localhost:3389"
+          # هذا السطر لإنشاء رابط عام مؤقت
+          Start-Process ./cloudflared.exe -ArgumentList "tunnel --url rdp://localhost:3389"
+          Write-Host "Waiting for tunnel to initialize..."
+          Start-Sleep -Seconds 20
+
+      - name: Keep Alive
+        run: |
+          Write-Host "RDP is ready!"
+          Write-Host "User: runneradmin"
+          Write-Host "Pass: Password123!"
+          # سيبقى السيرفر يعمل لمدة 6 ساعات
+          Start-Sleep -Seconds 21600
